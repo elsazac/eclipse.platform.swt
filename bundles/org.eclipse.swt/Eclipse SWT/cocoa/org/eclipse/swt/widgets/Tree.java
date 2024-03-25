@@ -97,6 +97,8 @@ public class Tree extends Composite {
 	/* Used to control drop feedback when DND.FEEDBACK_EXPAND and DND.FEEDBACK_SCROLL is set/not set */
 	boolean shouldExpand = true, shouldScroll = true;
 
+	final int nativeItemHeight;
+
 	static int NEXT_ID;
 
 	/*
@@ -144,6 +146,9 @@ public class Tree extends Composite {
  */
 public Tree (Composite parent, int style) {
 	super (parent, checkStyle (style));
+
+	this.nativeItemHeight = (int)((NSTableView)view).rowHeight();
+	setItemHeight(null, null, true);
 }
 
 @Override
@@ -230,11 +235,7 @@ long accessibilityAttributeValue(long id, long sel, long arg0) {
  * @see SelectionEvent
  */
 public void addSelectionListener(SelectionListener listener) {
-	checkWidget ();
-	if (listener == null) error (SWT.ERROR_NULL_ARGUMENT);
-	TypedListener typedListener = new TypedListener (listener);
-	addListener (SWT.Selection, typedListener);
-	addListener (SWT.DefaultSelection, typedListener);
+	addTypedListener(listener, SWT.Selection, SWT.DefaultSelection);
 }
 
 /**
@@ -257,11 +258,7 @@ public void addSelectionListener(SelectionListener listener) {
  * @see #removeTreeListener
  */
 public void addTreeListener(TreeListener listener) {
-	checkWidget ();
-	if (listener == null) error (SWT.ERROR_NULL_ARGUMENT);
-	TypedListener typedListener = new TypedListener (listener);
-	addListener (SWT.Expand, typedListener);
-	addListener (SWT.Collapse, typedListener);
+	addTypedListener(listener, SWT.Expand, SWT.Collapse);
 }
 
 int calculateWidth (TreeItem[] items, int index, GC gc, boolean recurse) {
@@ -3171,6 +3168,9 @@ void setItemHeight (Image image, NSFont font, boolean set) {
 	double ascent = font.ascender ();
 	double descent = -font.descender () + font.leading ();
 	int height = (int)Math.ceil (ascent + descent) + 1;
+	if (display.useNativeItemHeight) {
+		height = Math.max (height, nativeItemHeight);
+	}
 	Rectangle bounds = image != null ? image.getBounds () : imageBounds;
 	if (bounds != null) {
 		imageBounds = bounds;

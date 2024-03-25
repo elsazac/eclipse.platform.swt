@@ -17,6 +17,7 @@ package org.eclipse.swt.widgets;
 import java.lang.Runtime.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
 import java.util.function.*;
 
 import org.eclipse.swt.*;
@@ -103,7 +104,6 @@ import org.eclipse.swt.internal.cocoa.*;
  * @see <a href="http://www.eclipse.org/swt/">Sample code and further information</a>
  * @noextend This class is not intended to be subclassed by clients.
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
 public class Display extends Device implements Executor {
 
 	static byte[] types = {'*','\0'};
@@ -165,6 +165,8 @@ public class Display extends Device implements Executor {
 	NSFont searchFieldFont, comboBoxFont, sliderFont, scrollerFont;
 	NSFont textViewFont, tableViewFont, outlineViewFont, datePickerFont;
 	NSFont boxFont, tabViewFont, progressIndicatorFont;
+
+	boolean useNativeItemHeight;
 
 	Shell [] modalShells;
 	Dialog modalDialog;
@@ -362,7 +364,7 @@ public class Display extends Device implements Executor {
 	Object data;
 	String [] keys;
 	Object [] values;
-	static Map/*<NSObject, LONG>*/ dynamicObjectMap;
+	static Map<NSObject, LONG> dynamicObjectMap;
 
 	/*
 	* TEMPORARY CODE.  Install the runnable that
@@ -579,7 +581,7 @@ void addWidget (NSObject view, Widget widget) {
 
 	if (ivar == 0) {
 		if (dynamicObjectMap == null) {
-			dynamicObjectMap = new HashMap();
+			dynamicObjectMap = new HashMap<>();
 		}
 		LONG JNIRef = new LONG(widget.jniRef);
 		dynamicObjectMap.put(view, JNIRef);
@@ -999,7 +1001,7 @@ void createDisplay (DeviceData data) {
 	String className = "SWTApplication";
 	long cls;
 	if ((cls = OS.objc_lookUpClass (className)) == 0) {
-		Class clazz = getClass();
+		Class<?> clazz = getClass();
 		applicationCallback2 = new Callback(clazz, "applicationProc", 2);
 		long proc2 = applicationCallback2.getAddress();
 		applicationCallback3 = new Callback(clazz, "applicationProc", 3);
@@ -2354,7 +2356,7 @@ static Widget GetWidget (long id) {
 	if (iVar == 0) {
 		if (dynamicObjectMap != null) {
 			NSObject key = new NSObject(id);
-			LONG dynJNIRef = (LONG) dynamicObjectMap.get(key);
+			LONG dynJNIRef = dynamicObjectMap.get(key);
 			if (dynJNIRef != null) jniRef[0] = dynJNIRef.value;
 		}
 	}
@@ -2403,6 +2405,8 @@ protected void init () {
 	initColors ();
 	initFonts ();
 	setDeviceZoom ();
+
+	useNativeItemHeight = initUseNativeItemHeight();
 
 	/*
 	 * Create an application delegate for app-level notifications.  The AWT may have already set a delegate;
@@ -2500,6 +2504,19 @@ protected void init () {
 
 	isPainting = (NSMutableArray)new NSMutableArray().alloc();
 	isPainting = isPainting.initWithCapacity(12);
+}
+
+/**
+ * Checks if the native item height should be enforced as a minimum (which is true by default).
+ * 
+ * Newer version of macOS may use a default item height in Table, Tree and List
+ * controls that is larger than what is traditionally expected.
+ * 
+ * Enforcing the default height as a minimum may break existing assumptions and
+ * render UI elements with a padding that may be considered too large.
+ */
+private boolean initUseNativeItemHeight() {
+	return Boolean.parseBoolean(System.getProperty("org.eclipse.swt.internal.cocoa.useNativeItemHeight", "true"));
 }
 
 private static NSString getAwtRunLoopMode() {
@@ -2683,7 +2700,7 @@ long createMenuItemSubclass(long baseClass, String newClass, boolean isDynamic) 
 void initClasses () {
 	if (OS.objc_lookUpClass ("SWTView") != 0) return;
 
-	Class clazz = getClass ();
+	Class<?> clazz = getClass ();
 	dialogCallback3 = new Callback(clazz, "dialogProc", 3);
 	long dialogProc3 = dialogCallback3.getAddress();
 	dialogCallback4 = new Callback(clazz, "dialogProc", 4);
@@ -3424,7 +3441,7 @@ boolean isBundled () {
 	return false;
 }
 
-static boolean isValidClass (Class clazz) {
+static boolean isValidClass (Class<?> clazz) {
 	String name = clazz.getName ();
 	int index = name.lastIndexOf ('.');
 	return name.substring (0, index + 1).equals (PACKAGE_PREFIX);
@@ -4312,7 +4329,7 @@ Widget removeWidget (NSObject view) {
 
 	if (iVar == 0) {
 		if (dynamicObjectMap != null) {
-			LONG dynJNIRef = (LONG) dynamicObjectMap.get(view);
+			LONG dynJNIRef = dynamicObjectMap.get(view);
 			if (dynJNIRef != null) jniRef[0] = dynJNIRef.value;
 			dynamicObjectMap.remove(view);
 		}
@@ -5277,22 +5294,21 @@ public void syncExec (Runnable runnable) {
  */
 public <T, E extends Exception> T syncCall(SwtCallable<T, E> callable) throws E {
 	Objects.nonNull(callable);
-	@SuppressWarnings("unchecked")
-	T[] t = (T[]) new Object[1];
-	Object[] ex = new Object[1];
+	AtomicReference<T> result = new AtomicReference<>();
+	AtomicReference<Exception> ex = new AtomicReference<>();
 	syncExec(() -> {
 		try {
-			t[0] = callable.call();
+			result.setPlain(callable.call());
 		} catch (Exception e) {
-			ex[0] = e;
+			ex.setPlain(e);
 		}
 	});
-	if (ex[0] != null) {
+	if (ex.getPlain() != null) {
 		@SuppressWarnings("unchecked")
-		E e = (E) ex[0];
+		E e = (E) ex.getPlain();
 		throw e;
 	}
-	return t[0];
+	return result.getPlain();
 }
 
 /**

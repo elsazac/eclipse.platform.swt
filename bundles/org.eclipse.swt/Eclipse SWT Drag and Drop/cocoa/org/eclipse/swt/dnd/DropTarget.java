@@ -14,6 +14,7 @@
 package org.eclipse.swt.dnd;
 
 import java.util.*;
+import java.util.List;
 
 import org.eclipse.swt.*;
 import org.eclipse.swt.graphics.*;
@@ -77,7 +78,6 @@ import org.eclipse.swt.widgets.*;
  * @see <a href="http://www.eclipse.org/swt/">Sample code and further information</a>
  * @noextend This class is not intended to be subclassed by clients.
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
 public class DropTarget extends Widget {
 
 	static Callback dropTarget2Args, dropTarget3Args, dropTarget6Args;
@@ -85,7 +85,7 @@ public class DropTarget extends Widget {
 	static final String LOCK_CURSOR = "org.eclipse.swt.internal.lockCursor"; //$NON-NLS-1$
 
 	static {
-		Class clazz = DropTarget.class;
+		Class<?> clazz = DropTarget.class;
 
 		dropTarget2Args = new Callback(clazz, "dropTargetProc", 2);
 		proc2Args = dropTarget2Args.getAddress();
@@ -506,21 +506,7 @@ public Control getControl () {
  * @since 3.4
  */
 public DropTargetListener[] getDropListeners() {
-	Listener[] listeners = getListeners(DND.DragEnter);
-	int length = listeners.length;
-	DropTargetListener[] dropListeners = new DropTargetListener[length];
-	int count = 0;
-	for (int i = 0; i < length; i++) {
-		Listener listener = listeners[i];
-		if (listener instanceof DNDListener) {
-			dropListeners[count] = (DropTargetListener) ((DNDListener) listener).getEventListener();
-			count++;
-		}
-	}
-	if (count == length) return dropListeners;
-	DropTargetListener[] result = new DropTargetListener[count];
-	System.arraycopy(dropListeners, 0, result, 0, count);
-	return result;
+	return getTypedListeners(DND.DragEnter, DropTargetListener.class).toArray(DropTargetListener[]::new);
 }
 
 /**
@@ -798,12 +784,12 @@ long outlineView_validateDrop_proposedItem_proposedChildIndex(long id, long sel,
  */
 public void removeDropListener(DropTargetListener listener) {
 	if (listener == null) DND.error (SWT.ERROR_NULL_ARGUMENT);
-	removeListener (DND.DragEnter, listener);
-	removeListener (DND.DragLeave, listener);
-	removeListener (DND.DragOver, listener);
-	removeListener (DND.DragOperationChanged, listener);
-	removeListener (DND.Drop, listener);
-	removeListener (DND.DropAccept, listener);
+	removeTypedListener(DND.DragEnter, listener);
+	removeTypedListener(DND.DragLeave, listener);
+	removeTypedListener(DND.DragOver, listener);
+	removeTypedListener(DND.DragOperationChanged, listener);
+	removeTypedListener(DND.Drop, listener);
+	removeTypedListener(DND.DropAccept, listener);
 }
 
 /**
@@ -916,7 +902,7 @@ public void setTransfer(Transfer... transferAgents){
 
 	// Register the types as valid drop types in Cocoa.
 	// Accumulate all of the transfer types into a list.
-	ArrayList typeStrings = new ArrayList();
+	List<String> typeStrings = new ArrayList<>();
 
 	for (int i = 0; i < this.transferAgents.length; i++) {
 		String[] types = transferAgents[i].getTypeNames();
