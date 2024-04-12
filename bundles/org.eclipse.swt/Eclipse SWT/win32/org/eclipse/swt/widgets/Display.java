@@ -2744,6 +2744,7 @@ public long internal_new_GC (GCData data) {
 		} else {
 			data.style |= SWT.LEFT_TO_RIGHT;
 		}
+		data.nativeZoom = getPrimaryMonitor().getZoom();
 		data.device = this;
 		data.font = getSystemFont ();
 	}
