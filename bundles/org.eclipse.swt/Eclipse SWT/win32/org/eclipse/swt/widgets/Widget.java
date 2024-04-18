@@ -124,6 +124,7 @@ public abstract class Widget {
 		icce.dwSize = INITCOMMONCONTROLSEX.sizeof;
 		icce.dwICC = 0xffff;
 		OS.InitCommonControlsEx (icce);
+		DPIZoomChangeRegistry.registerHandler(Widget::handleDPIChange, Widget.class);
 	}
 
 /**
@@ -2554,5 +2555,9 @@ int getZoom() {
 
 void setZoom(int zoom) {
 	this.zoom = zoom;
+}
+
+private static void handleDPIChange(Widget widget, int newZoom, float scalingFactor) {
+	widget.setZoom(newZoom);
 }
 }
